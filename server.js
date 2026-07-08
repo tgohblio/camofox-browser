@@ -938,6 +938,7 @@ async function launchBrowserInstance() {
         proxy: launchProxy,
         geoip: !!launchProxy,
         virtual_display: vdDisplay,
+        window: CONFIG.persistentProfiles ? persistentWindowSize() : undefined,
       });
       options.proxy = normalizePlaywrightProxy(options.proxy);
       await pluginEvents.emitAsync('browser:launching', { options });
@@ -1090,6 +1091,15 @@ async function closeAllSessions(reason, { clearDownloads = true, clearLocks = tr
 // cannot capture. Required for sites that store auth in IndexedDB (e.g. Telegram
 // Web). Each persistent identity is its own camoufox process (heavier), so this
 // is opt-in; non-persistent sessions keep the shared-browser/ephemeral-context model.
+// Pin the persistent browser window to the display size (default 1280x720, or
+// CAMOFOX_WINDOW / VNC_RESOLUTION) so its page doesn't render at the camoufox
+// fingerprint's screen size (e.g. 2560x1440) and overflow the VNC display.
+function persistentWindowSize() {
+  const raw = process.env.CAMOFOX_WINDOW || process.env.VNC_RESOLUTION || '1280x720';
+  const m = String(raw).match(/(\d+)\s*[xX]\s*(\d+)/);
+  return m ? [parseInt(m[1], 10), parseInt(m[2], 10)] : [1280, 720];
+}
+
 function persistentProfileDir(key) {
   const safe = crypto.createHash('sha256').update(String(key)).digest('hex').slice(0, 32);
   return `${CONFIG.userDataDir}/${safe}`;
@@ -1108,6 +1118,7 @@ async function buildPersistentLaunchOptions(launchProxy) {
     proxy: launchProxy || undefined,
     geoip: !!launchProxy,
     virtual_display: vdDisplay,
+    window: persistentWindowSize(),
   });
   options.proxy = normalizePlaywrightProxy(options.proxy);
   return options;
